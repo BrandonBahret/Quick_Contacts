@@ -6,14 +6,14 @@ import android.support.v7.app.AlertDialog;
 
 import java.util.ArrayList;
 
-public class ConfirmationDialog extends AlertDialog.Builder {
-    private ArrayList<OnFinished> onFinishedListeners = new ArrayList<OnFinished>();
+class ConfirmationDialog extends AlertDialog.Builder {
+    private ArrayList<OnFinished> onFinishedListeners = new ArrayList<>();
 
-    public void setOnFinished(OnFinished listener){
+    void setOnFinished(OnFinished listener){
         onFinishedListeners.add(listener);
     }
 
-    public interface OnFinished{
+    interface OnFinished{
         void onFinished(boolean result);
     }
 

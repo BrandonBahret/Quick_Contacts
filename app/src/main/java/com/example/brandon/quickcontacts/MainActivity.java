@@ -5,13 +5,15 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
+import android.view.Menu;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -32,10 +34,8 @@ public class MainActivity extends AppCompatActivity {
                 if(type == contactsManager.INSERTED){
                     String name = params.getString("name");
                     String phoneNumber = params.getString("phone_number");
+                    int index = params.getInt("index");
 
-                    int index = contactsManager.getIndexFromContactName(name);
-
-                    // TODO :: Bug where the index is out of bounds, due to reformatting of the name on insert
                     contactLayout.addView(contactsManager.getView(name, phoneNumber, 20, 40), index);
                 }
 
@@ -43,13 +43,15 @@ public class MainActivity extends AppCompatActivity {
                     String oldName = params.getString("old_name");
                     String newName = params.getString("new_name");
                     String newPhoneNumber = params.getString("new_phone_number");
+                    int index = params.getInt("index");
 
                     for(int i = 0; i < contactLayout.getChildCount(); i++){
                         View view = contactLayout.getChildAt(i);
                         String name = ((TextView)view.findViewById(R.id.name)).getText().toString();
                         if(name.equalsIgnoreCase(oldName)){
                             contactLayout.removeView(view);
-                            contactLayout.addView(contactsManager.getView(newName, newPhoneNumber, 20, 40), i);
+
+                            contactLayout.addView(contactsManager.getView(newName, newPhoneNumber, 20, 40), index);
                         }
                     }
 
@@ -57,8 +59,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // TODO :: add search method
-        // TODO :: add alphabetical ordering to contacts display method
         // TODO :: add Alphabetical sectioning
         // TODO :: add Alphabetical side indexing
 
@@ -93,16 +93,54 @@ public class MainActivity extends AppCompatActivity {
         displayContacts();
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_bar, menu);
+
+        SearchView searchView = (SearchView)menu.findItem(R.id.search).getActionView();
+        searchView.setOnQueryTextListener(
+                new SearchView.OnQueryTextListener() {
+                    @Override
+                    public boolean onQueryTextSubmit(String query) {
+                        searchContacts(query);
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onQueryTextChange(String query) {
+                        searchContacts(query);
+                        return false;
+                    }
+                }
+        );
+
+        return true;
+    }
+
+    public void searchContacts(String query){
+        query = query.toLowerCase();
+
+        for(int i = 0; i < contactLayout.getChildCount(); i++){
+            View view = contactLayout.getChildAt(i);
+            String name = ((TextView)view.findViewById(R.id.name)).getText().toString();
+            if(name.toLowerCase().contains(query)){
+                view.setVisibility(View.VISIBLE);
+            }
+            else{
+                view.setVisibility(View.GONE);
+            }
+        }
+
+    }
+
     public void displayContacts(){
-        Map<String, String> contacts = contactsManager.getAddressBook();
+        ArrayList<ContactsManager.Contact> contacts = contactsManager.getAddressBook();
 
         contactLayout = (LinearLayout)findViewById(R.id.contacts_container);
 
-        for (Map.Entry<String, String> pair : contacts.entrySet()) {
-            String name = pair.getKey();
-            String phoneNumber = pair.getValue();
-
-            contactLayout.addView(contactsManager.getView(name, phoneNumber, 20, 40));
+        for(ContactsManager.Contact contact : contacts){
+            View newView = contactsManager.getView( contact.name, contact.phoneNumber, 20, 40 );
+            contactLayout.addView(newView);
         }
     }
 
@@ -124,8 +162,10 @@ public class MainActivity extends AppCompatActivity {
             public void onFinishedWithResult(int result, Bundle params) {
                 if(result == EditContactDialog.DELETE){
 
+
+                    String message = String.format(Locale.US, getString(R.string.about_to_delete_format), name);
                     ConfirmationDialog confirmationDialog = new ConfirmationDialog(MainActivity.this,
-                            "Are You Sure?", "About to delete contact " + name, "confirm", "Cancel");
+                            getString(R.string.are_you_sure), message, getString(R.string.confirm_delete), getString(android.R.string.cancel));
 
                     confirmationDialog.setOnFinished(new ConfirmationDialog.OnFinished() {
                         @Override
@@ -159,8 +199,10 @@ public class MainActivity extends AppCompatActivity {
         final String name = ((TextView)v.findViewById(R.id.name)).getText().toString();
         final String phoneNumber = ((TextView)v.findViewById(R.id.phonenumber)).getText().toString();
 
-        ConfirmationDialog dialog = new ConfirmationDialog(this, "Are You Sure?",
-                "About to call " + name, "Make Call", "Cancel");
+        String message = String.format(Locale.US, getString(R.string.about_to_call_format), name);
+
+        ConfirmationDialog dialog = new ConfirmationDialog(this, getString(R.string.are_you_sure),
+                message, getString(R.string.make_call), getString(android.R.string.cancel));
 
         dialog.setOnFinished(new ConfirmationDialog.OnFinished() {
             @Override
@@ -171,8 +213,6 @@ public class MainActivity extends AppCompatActivity {
                     if (intent.resolveActivity(getPackageManager()) != null) {
                         startActivity(intent);
                     }
-
-                    Toast.makeText(getApplicationContext(), "Calling " + name, Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -185,16 +225,14 @@ public class MainActivity extends AppCompatActivity {
         final String name = ((TextView)v.findViewById(R.id.name)).getText().toString();
         final String phoneNumber = ((TextView)v.findViewById(R.id.phonenumber)).getText().toString();
 
-        ConfirmationDialog dialog = new ConfirmationDialog(this, "Are You Sure?",
-                "Start conversation with " + name, "Open Messenger", "Cancel");
+        String message = String.format(Locale.US, getString(R.string.about_to_message_format), name);
+        ConfirmationDialog dialog = new ConfirmationDialog(this, getString(R.string.are_you_sure),
+                message, getString(R.string.open_messenger), getString(android.R.string.cancel));
 
         dialog.setOnFinished(new ConfirmationDialog.OnFinished() {
             @Override
             public void onFinished(boolean result) {
                 if(result){
-                    Toast.makeText(getApplicationContext(),
-                            "Launching messenger for " + name, Toast.LENGTH_SHORT).show();
-
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.fromParts("sms", phoneNumber, null)));
                 }
             }

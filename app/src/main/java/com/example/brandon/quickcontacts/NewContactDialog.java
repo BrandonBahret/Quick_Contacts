@@ -15,7 +15,7 @@ import java.util.ArrayList;
 
 public class NewContactDialog extends DialogFragment {
 
-    private ArrayList<OnFinishedListener> onFinishedListeners = new ArrayList<OnFinishedListener>();
+    private ArrayList<OnFinishedListener> onFinishedListeners = new ArrayList<>();
 
     public void setOnFinishedListener(OnFinishedListener listener){
         onFinishedListeners.add(listener);
@@ -42,7 +42,7 @@ public class NewContactDialog extends DialogFragment {
 
         builder.setView(contentView);
 
-        builder.setTitle("Add Contact")
+        builder.setTitle(R.string.new_contact_dialog_title)
                 .setPositiveButton(R.string.add_contact, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
                         String name = ((EditText)contentView.findViewById(R.id.nameEditText))

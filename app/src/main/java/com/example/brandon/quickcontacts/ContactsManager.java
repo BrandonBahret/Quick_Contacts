@@ -10,37 +10,50 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
+import android.support.annotation.Nullable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+import java.util.Collections;
+import java.util.Comparator;
 
-public class ContactsManager {
+class ContactsManager {
 
-    private ArrayList<OnFinishedListener> onFinishedListeners = new ArrayList<OnFinishedListener>();
+    private ArrayList<OnFinishedListener> onFinishedListeners = new ArrayList<>();
 
-    public void setOnFinishedListener(OnFinishedListener listener){
+    void setOnFinishedListener(OnFinishedListener listener){
         onFinishedListeners.add(listener);
     }
 
-    public interface OnFinishedListener{
+    interface OnFinishedListener{
         void onFinishedWithResult(int type, Bundle params);
     }
 
     private Context context;
-    public final int INSERTED = 0, UPDATED = 1;
+    final int INSERTED = 0, UPDATED = 1;
 
     ContactsManager(Context context){
         this.context = context;
     }
 
-    public Map<String, String> getAddressBook(){
-        Map<String, String> result = new HashMap<String, String>();
+    class Contact{
+        String name, phoneNumber;
+        int index;
+
+        Contact(String name, String phoneNumber, int index){
+            this.name = name;
+            this.phoneNumber = phoneNumber;
+            this.index = index;
+        }
+    }
+
+    ArrayList<Contact> getAddressBook(){
+
+        ArrayList<Contact> result = new ArrayList<>();
 
         Cursor cursor = context.getContentResolver().query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, null, null, null
@@ -48,21 +61,88 @@ public class ContactsManager {
 
         if(cursor != null) {
             while (cursor.moveToNext()) {
-                int phoneIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
                 int nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME);
+                int phoneIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
 
-                String phone = cursor.getString(phoneIndex);
                 String name = cursor.getString(nameIndex);
-                result.put(name, phone);
+                String phone = cursor.getString(phoneIndex);
+
+                Contact contact = new Contact(name, phone, -1);
+
+                result.add(contact);
             }
 
             cursor.close();
         }
 
+        Collections.sort(result, new Comparator<Contact>() {
+            @Override
+            public int compare(Contact contact1, Contact contact2) {
+                return contact1.name.toLowerCase().
+                        compareTo(contact2.name.toLowerCase());
+            }
+        });
+
+        int index = 0;
+        for(Contact contact:result) {
+            contact.index = index++;
+        }
+
         return result;
     }
 
-    String getContactIdFromName(String queryName){
+    @Nullable
+    private Contact readContactFromContactID(String contactId) {
+
+        Cursor cursor = context.getContentResolver().query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                null,
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                new String[]{contactId}, null);
+
+        if (cursor != null) {
+            if (cursor.moveToNext()) {
+                int idx = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
+                String name = cursor.getString(idx);
+
+                idx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
+                String phoneNumber = cursor.getString(idx);
+
+                int index = getIndexFromContactName(name);
+
+                cursor.close();
+                return new Contact(name, phoneNumber, index);
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
+    private Contact readContactFromResults(ContentProviderResult[] results){
+        Uri contactUri = results[1].uri;
+
+        Cursor cursor = context.getContentResolver().query(contactUri, null, null, null, null);
+
+        if(cursor != null) {
+            if (cursor.moveToFirst()) {
+                int idx = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
+                String name = cursor.getString(idx);
+
+                idx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
+                String phoneNumber = cursor.getString(idx);
+
+                int index = getIndexFromContactName(name);
+
+                return new Contact(name, phoneNumber, index);
+            }
+            cursor.close();
+        }
+
+        return null;
+    }
+
+    private String getContactIdFromName(String queryName){
         String contactId = "";
 
         Cursor cursor = context.getContentResolver().query(
@@ -87,26 +167,24 @@ public class ContactsManager {
         return contactId;
     }
 
-    int getIndexFromContactName(String name){
+    private int getIndexFromContactName(String name){
 
-        Map<String, String> contacts = getAddressBook();
+        ArrayList<Contact> contacts = getAddressBook();
 
-        int index = 0;
-        for (Map.Entry<String, String> pair : contacts.entrySet()) {
-            String currentName = pair.getKey();
-            if(currentName.equals(name)){
-                break;
+        for(Contact contact: contacts){
+            if(contact.name.equalsIgnoreCase(name)){
+                return contact.index;
             }
-            index++;
         }
 
-        return index;
+        return -1;
     }
 
     boolean removeContact(String name) {
         ContentResolver cr = context.getContentResolver();
         Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI,
                 null, null, null, null);
+
         if(cur != null){
             while(cur.moveToNext()){
                 try{
@@ -117,7 +195,7 @@ public class ContactsManager {
                     }
                 }
                 catch(Exception e) {
-                    System.out.println(e.getStackTrace());
+                    e.printStackTrace();
                 }
             }
             cur.close();
@@ -130,107 +208,132 @@ public class ContactsManager {
         // Code snippet from Stack Overflow:
         // http://stackoverflow.com/questions/4459138/insert-contact-in-android-with-contactscontract
 
-        ArrayList<ContentProviderOperation> ops = new ArrayList<ContentProviderOperation>();
-        int rawContactInsertIndex = ops.size();
+        // If there isn't a contact with the given name
+        if(getIndexFromContactName(name) == -1) {
 
-        ops.add(ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
-                .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
-                .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null).build());
+            ArrayList<ContentProviderOperation> ops = new ArrayList<>();
+            int rawContactInsertIndex = ops.size();
 
-        //Phone Number
-        ops.add(ContentProviderOperation
-                .newInsert(ContactsContract.Data.CONTENT_URI)
-                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID,
-                        rawContactInsertIndex)
-                .withValue(ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, phoneNumber)
-                .withValue(ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, "1").build());
+            ops.add(ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null).build());
 
-        //Display name/Contact name
-        ops.add(ContentProviderOperation
-                .newInsert(ContactsContract.Data.CONTENT_URI)
-                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
-                .withValue(ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, name)
-                .build());
-        try {
-            ContentProviderResult[] results =
-                    context.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        } catch (OperationApplicationException e) {
-            e.printStackTrace();
+            //Phone Number
+            ops.add(ContentProviderOperation
+                    .newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID,
+                            rawContactInsertIndex)
+                    .withValue(ContactsContract.Data.MIMETYPE,
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, phoneNumber)
+                    .withValue(ContactsContract.Data.MIMETYPE,
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, "1").build());
+
+            //Display name/Contact name
+            ops.add(ContentProviderOperation
+                    .newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
+                    .withValue(ContactsContract.Data.MIMETYPE,
+                            ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, name)
+                    .build());
+            try {
+                ContentProviderResult[] results =
+                        context.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
+
+                // Now entering code not from stack overflow
+                Contact newContact = readContactFromResults(results);
+
+                if (newContact != null) {
+                    Bundle params = new Bundle();
+                    params.putString("name", newContact.name);
+                    params.putString("phone_number", newContact.phoneNumber);
+                    params.putInt("index", newContact.index);
+
+                    for (OnFinishedListener listener : onFinishedListeners) {
+                        listener.onFinishedWithResult(INSERTED, params);
+                    }
+                }
+
+            }  catch (OperationApplicationException | RemoteException e) {
+                e.printStackTrace();
+            }
         }
-
-        // Now entering code not from stack overflow
-
-        Bundle params = new Bundle();
-        params.putString("name", name);
-        params.putString("phone_number", phoneNumber);
-
-        for(OnFinishedListener listener : onFinishedListeners){
-            listener.onFinishedWithResult(INSERTED, params);
+        else{
+            Toast.makeText(context, context.getResources().getString(R.string.add_contact_name_fail),
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
     void updateContact(String oldName, String newName, String newPhoneNumber){
-        // TODO :: Change this method to put a name into the Bundle that matches the one stored in contacts
-        // When the names don't match other functions malfunction causing app crashing bugs
 
-        Bundle params = new Bundle();
-        params.putString("old_name", oldName);
-        params.putString("new_name", newName);
-        params.putString("new_phone_number", newPhoneNumber);
+        // If there isn't already a contact named "newName"
+        if(getIndexFromContactName(newName) == -1 || (oldName.equals(newName))) {
+            Bundle params = new Bundle();
+            params.putString("old_name", oldName);
+            params.putString("new_name", newName);
+            params.putString("new_phone_number", newPhoneNumber);
 
-        String contactId = getContactIdFromName(oldName);
-        int id = Integer.parseInt(contactId);
+            String contactId = getContactIdFromName(oldName);
+            int id = Integer.parseInt(contactId);
 
-        ArrayList<ContentProviderOperation> ops = new ArrayList<ContentProviderOperation>();
+            ArrayList<ContentProviderOperation> ops = new ArrayList<>();
 
-        // Name
-        ContentProviderOperation.Builder builder = ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI);
-        builder.withSelection(ContactsContract.Data.CONTACT_ID + "=? AND " +
-                ContactsContract.Data.MIMETYPE + "=?", new String[]{String.valueOf(id),
-                ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE});
+            // Name
+            ContentProviderOperation.Builder builder = ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI);
+            builder.withSelection(ContactsContract.Data.CONTACT_ID + "=? AND " +
+                    ContactsContract.Data.MIMETYPE + "=?", new String[]{String.valueOf(id),
+                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE});
 
-//         Split the full name into it's components, this is necessary to update the contact name.
-        NameSplitter nameSplitter = new NameSplitter("Dr, Mr, Mrs, Ms, Miss",
-                "", "Jr, Sr, Phd, M.D., MD, D.D.S.", "", Locale.US);
-        NameSplitter.Name name = new NameSplitter.Name();
-        nameSplitter.split(name, newName);
+            // Split the full name into it's components, this is necessary to update the contact name.
+            NameSplitter nameSplitter = new NameSplitter("Dr, Mr, Mrs, Ms, Miss",
+                    "", "Jr, Sr, Phd, M.D., MD, D.D.S.", "");
+            NameSplitter.Name name = new NameSplitter.Name();
+            nameSplitter.split(name, newName);
 
-        builder.withValue(ContactsContract.CommonDataKinds.StructuredName.PREFIX, name.getPrefix());
-        builder.withValue(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, name.getGivenNames()); // First Name
-        builder.withValue(ContactsContract.CommonDataKinds.StructuredName.MIDDLE_NAME, name.getMiddleName());
-        builder.withValue(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME, name.getFamilyName()); // Last Name
-        builder.withValue(ContactsContract.CommonDataKinds.StructuredName.SUFFIX, name.getSuffix());
-        ops.add(builder.build());
+            builder.withValue(ContactsContract.CommonDataKinds.StructuredName.PREFIX, name.getPrefix());
+            builder.withValue(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, name.getGivenNames()); // First Name
+            builder.withValue(ContactsContract.CommonDataKinds.StructuredName.MIDDLE_NAME, name.getMiddleName());
+            builder.withValue(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME, name.getFamilyName()); // Last Name
+            builder.withValue(ContactsContract.CommonDataKinds.StructuredName.SUFFIX, name.getSuffix());
+            ops.add(builder.build());
 
-        // Number
-        builder = ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI);
-        builder.withSelection(ContactsContract.Data.CONTACT_ID + "=? AND " +
-                ContactsContract.Data.MIMETYPE + "=? AND " +
-                ContactsContract.CommonDataKinds.Organization.TYPE + "=?",
-                new String[]{String.valueOf(id), ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
-                        String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME)});
+            // Number
+            builder = ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI);
+            builder.withSelection(ContactsContract.Data.CONTACT_ID + "=? AND " +
+                            ContactsContract.Data.MIMETYPE + "=? AND " +
+                            ContactsContract.CommonDataKinds.Organization.TYPE + "=?",
+                    new String[]{String.valueOf(id), ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+                            String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME)});
 
-        builder.withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, newPhoneNumber);
-        ops.add(builder.build());
+            builder.withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, newPhoneNumber);
+            ops.add(builder.build());
 
 
-        try {
-            context.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
-            for(OnFinishedListener listener : onFinishedListeners){
-                listener.onFinishedWithResult(UPDATED, params);
+            try {
+                context.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
+
+                Contact newContact = readContactFromContactID(contactId);
+                if (newContact != null) {
+                    newName = newContact.name;
+                    params.putString("new_name", newName);
+                    params.putString("new_phone_number", newContact.phoneNumber);
+                }
+
+                params.putInt("index", getIndexFromContactName(newName));
+                for (OnFinishedListener listener : onFinishedListeners) {
+                    listener.onFinishedWithResult(UPDATED, params);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
-        catch (Exception e) {
-            e.printStackTrace();
+        else{
+            Toast.makeText(context, context.getResources().getString(R.string.edit_contact_name_fail),
+                    Toast.LENGTH_SHORT).show();
         }
+
     }
 
     View getView(String name, String phoneNumber, int topMargin, int bottomMargin){

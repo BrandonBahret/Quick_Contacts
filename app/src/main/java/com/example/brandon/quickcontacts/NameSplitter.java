@@ -17,11 +17,9 @@
 // Source :: https://android.googlesource.com/platform/packages/providers/ContactsProvider/+/eclair-release/src/com/android/providers/contacts/NameSplitter.java
 
 package com.example.brandon.quickcontacts;
-import android.content.ContentValues;
 import android.provider.ContactsContract.CommonDataKinds.StructuredName;
-import android.text.TextUtils;
+
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.StringTokenizer;
 /**
  * The purpose of this class is to split a full name into given names and last
@@ -38,58 +36,36 @@ import java.util.StringTokenizer;
  * <li>Assign the rest of the words as the "given names".</li>
  * </ol>
  */
-public class NameSplitter {
-    public static final int MAX_TOKENS = 10;
+class NameSplitter {
+    private static final int MAX_TOKENS = 10;
     private final HashSet<String> mPrefixesSet;
     private final HashSet<String> mSuffixesSet;
     private final int mMaxSuffixLength;
     private final HashSet<String> mLastNamePrefixesSet;
     private final HashSet<String> mConjuctions;
-    private final Locale mLocale;
-    public static class Name {
+    static class Name {
         private String prefix;
         private String givenNames;
         private String middleName;
         private String familyName;
         private String suffix;
-        public Name() {
+        Name() {
         }
-        public Name(String prefix, String givenNames, String middleName, String familyName,
-                    String suffix) {
-            this.prefix = prefix;
-            this.givenNames = givenNames;
-            this.middleName = middleName;
-            this.familyName = familyName;
-            this.suffix = suffix;
-        }
-        public String getPrefix() {
+
+        String getPrefix() {
             return prefix;
         }
-        public String getGivenNames() {
+        String getGivenNames() {
             return givenNames;
         }
-        public String getMiddleName() {
+        String getMiddleName() {
             return middleName;
         }
-        public String getFamilyName() {
+        String getFamilyName() {
             return familyName;
         }
-        public String getSuffix() {
+        String getSuffix() {
             return suffix;
-        }
-        public void fromValues(ContentValues values) {
-            prefix = values.getAsString(StructuredName.PREFIX);
-            givenNames = values.getAsString(StructuredName.GIVEN_NAME);
-            middleName = values.getAsString(StructuredName.MIDDLE_NAME);
-            familyName = values.getAsString(StructuredName.FAMILY_NAME);
-            suffix = values.getAsString(StructuredName.SUFFIX);
-        }
-        public void toValues(ContentValues values) {
-            values.put(StructuredName.PREFIX, prefix);
-            values.put(StructuredName.GIVEN_NAME, givenNames);
-            values.put(StructuredName.MIDDLE_NAME, middleName);
-            values.put(StructuredName.FAMILY_NAME, familyName);
-            values.put(StructuredName.SUFFIX, suffix);
         }
     }
     private static class NameTokenizer extends StringTokenizer {
@@ -97,7 +73,7 @@ public class NameSplitter {
         private int mDotBitmask;
         private int mStartPointer;
         private int mEndPointer;
-        public NameTokenizer(String fullName) {
+        NameTokenizer(String fullName) {
             super(fullName, " .,", true);
             mTokens = new String[MAX_TOKENS];
             // Iterate over tokens, skipping over empty ones and marking tokens that
@@ -121,7 +97,7 @@ public class NameSplitter {
         /**
          * Returns true if the token is followed by a dot in the original full name.
          */
-        public boolean hasDot(int index) {
+        boolean hasDot(int index) {
             return (mDotBitmask & (1 << index)) != 0;
         }
     }
@@ -137,14 +113,12 @@ public class NameSplitter {
      * @param commonConjunctions comma-separated list of common conjuctions,
      *            e.g. "AND, Or"
      */
-    public NameSplitter(String commonPrefixes, String commonLastNamePrefixes,
-                        String commonSuffixes, String commonConjunctions, Locale locale) {
-        // TODO: refactor this to use <string-array> resources
+    NameSplitter(String commonPrefixes, String commonLastNamePrefixes,
+                        String commonSuffixes, String commonConjunctions) {
         mPrefixesSet = convertToSet(commonPrefixes);
         mLastNamePrefixesSet = convertToSet(commonLastNamePrefixes);
         mSuffixesSet = convertToSet(commonSuffixes);
         mConjuctions = convertToSet(commonConjunctions);
-        mLocale = locale;
         int maxLength = 0;
         for (String suffix : mSuffixesSet) {
             if (suffix.length() > maxLength) {
@@ -158,40 +132,20 @@ public class NameSplitter {
      * and converts them to upper case.
      */
     private static HashSet<String> convertToSet(String strings) {
-        HashSet<String> set = new HashSet<String>();
+        HashSet<String> set = new HashSet<>();
         if (strings != null) {
             String[] split = strings.split(",");
-            for (int i = 0; i < split.length; i++) {
-                set.add(split[i].trim().toUpperCase());
+            for(String token:split){
+                set.add(token.trim().toUpperCase());
             }
         }
         return set;
     }
-    /**
-     * Parses a full name and returns components as a list of tokens.
-     */
-    public int tokenize(String[] tokens, String fullName) {
-        if (fullName == null) {
-            return 0;
-        }
-        NameTokenizer tokenizer = new NameTokenizer(fullName);
-        if (tokenizer.mStartPointer == tokenizer.mEndPointer) {
-            return 0;
-        }
-        String firstToken = tokenizer.mTokens[tokenizer.mStartPointer];
-        if (mPrefixesSet.contains(firstToken.toUpperCase())) {
-            tokenizer.mStartPointer++;
-        }
-        int count = 0;
-        for (int i = tokenizer.mStartPointer; i < tokenizer.mEndPointer; i++) {
-            tokens[count++] = tokenizer.mTokens[i];
-        }
-        return count;
-    }
+
     /**
      * Parses a full name and returns parsed components in the Name object.
      */
-    public void split(Name name, String fullName) {
+    void split(Name name, String fullName) {
         if (fullName == null) {
             return;
         }
@@ -214,20 +168,7 @@ public class NameSplitter {
      * Flattens the given {@link Name} into a single field, usually for storage
      * in {@link StructuredName#DISPLAY_NAME}.
      */
-    public String join(Name name) {
-        final boolean hasGiven = !TextUtils.isEmpty(name.givenNames);
-        final boolean hasFamily = !TextUtils.isEmpty(name.familyName);
-        // TODO: write locale-specific blending logic here
-        if (hasGiven && hasFamily) {
-            return name.givenNames + " " + name.familyName;
-        } else if (hasFamily) {
-            return name.familyName;
-        } else if (hasGiven) {
-            return name.givenNames;
-        } else {
-            return null;
-        }
-    }
+
     /**
      * Parses the first word from the name if it is a prefix.
      */

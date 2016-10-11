@@ -15,7 +15,7 @@ import java.util.ArrayList;
 
 public class EditContactDialog extends DialogFragment {
 
-    private ArrayList<OnFinishedListener> onFinishedListeners = new ArrayList<OnFinishedListener>();
+    private ArrayList<OnFinishedListener> onFinishedListeners = new ArrayList<>();
 
     public void setOnFinishedListener(OnFinishedListener listener){
         onFinishedListeners.add(listener);
@@ -28,14 +28,14 @@ public class EditContactDialog extends DialogFragment {
     public static final int DELETE = 2, UPDATE = 3;
     public View contentView;
 
-    private String oldName, oldPhoneNumber;
+    private String oldName;
 
     @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setTitle("Edit Contact")
+        builder.setTitle(R.string.edit_contact_dialog_title)
                 .setPositiveButton(R.string.update_contact, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
                         Bundle params = new Bundle();
@@ -86,7 +86,7 @@ public class EditContactDialog extends DialogFragment {
 
         Bundle args = getArguments();
         oldName = args.getString("name");
-        oldPhoneNumber = args.getString("phone_number");
+        String oldPhoneNumber = args.getString("phone_number");
 
         EditText nameEdit = (EditText)contentView.findViewById(R.id.nameEditText);
         nameEdit.setText(oldName);
