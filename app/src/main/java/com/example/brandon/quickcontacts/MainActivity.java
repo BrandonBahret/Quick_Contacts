@@ -1,22 +1,67 @@
 package com.example.brandon.quickcontacts;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Map;
+
 public class MainActivity extends AppCompatActivity {
+
+    ContactsManager contactsManager;
+
+    LinearLayout contactLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        contactsManager = new ContactsManager(MainActivity.this);
+        contactsManager.setOnFinishedListener(new ContactsManager.OnFinishedListener() {
+            @Override
+            public void onFinishedWithResult(int type, Bundle params) {
+
+                if(type == contactsManager.INSERTED){
+                    String name = params.getString("name");
+                    String phoneNumber = params.getString("phone_number");
+
+                    int index = contactsManager.getIndexFromContactName(name);
+
+                    // TODO :: Bug where the index is out of bounds, due to reformatting of the name on insert
+                    contactLayout.addView(contactsManager.getView(name, phoneNumber, 20, 40), index);
+                }
+
+                else if(type == contactsManager.UPDATED){
+                    String oldName = params.getString("old_name");
+                    String newName = params.getString("new_name");
+                    String newPhoneNumber = params.getString("new_phone_number");
+
+                    for(int i = 0; i < contactLayout.getChildCount(); i++){
+                        View view = contactLayout.getChildAt(i);
+                        String name = ((TextView)view.findViewById(R.id.name)).getText().toString();
+                        if(name.equalsIgnoreCase(oldName)){
+                            contactLayout.removeView(view);
+                            contactLayout.addView(contactsManager.getView(newName, newPhoneNumber, 20, 40), i);
+                        }
+                    }
+
+                }
+            }
+        });
+
+        // TODO :: add search method
+        // TODO :: add alphabetical ordering to contacts display method
+        // TODO :: add Alphabetical sectioning
+        // TODO :: add Alphabetical side indexing
+
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -24,60 +69,90 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view){
-                DialogFragment dialog = new NewContactDialog();
+                NewContactDialog dialog = new NewContactDialog();
+
+                dialog.setOnFinishedListener(new NewContactDialog.OnFinishedListener() {
+                    @Override
+                    public void onFinishedWithResult(String name, String phoneNumber) {
+                        contactsManager.addContact(name, phoneNumber);
+                    }
+                });
+
                 dialog.show(getSupportFragmentManager(), "new contact");
             }
         });
 
-        LinearLayout contactLayout = (LinearLayout)findViewById(R.id.contacts_container);
+        displayContacts();
+    }
 
-        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        layoutParams.setMargins(0, 0, 0, 45);
+    @Override
+    protected void onStart() {
+        super.onStart();
 
-        for(int i=0;i<100;i++){
-            View v = View.inflate(this, R.layout.contact_layout, null);
-            v.setLayoutParams(layoutParams);
-            contactLayout.addView(v);
+        contactLayout.removeAllViews();
+        displayContacts();
+    }
+
+    public void displayContacts(){
+        Map<String, String> contacts = contactsManager.getAddressBook();
+
+        contactLayout = (LinearLayout)findViewById(R.id.contacts_container);
+
+        for (Map.Entry<String, String> pair : contacts.entrySet()) {
+            String name = pair.getKey();
+            String phoneNumber = pair.getValue();
+
+            contactLayout.addView(contactsManager.getView(name, phoneNumber, 20, 40));
         }
-
     }
 
     public void editContact(View view) {
-        View v = (View)view.getParent().getParent();
-        String name = ((TextView)v.findViewById(R.id.name)).getText().toString();
-        String phoneNumber = ((TextView)v.findViewById(R.id.phonenumber)).getText().toString();
+        // To get the contact view that was clicked we must get the parent of the parent of the button.
+        final View contactView   = (View)view.getParent().getParent();
+        final String name        = ((TextView)contactView.findViewById(R.id.name)).getText().toString();
+        final String phoneNumber = ((TextView)contactView.findViewById(R.id.phonenumber)).getText().toString();
 
         Bundle args = new Bundle();
         args.putString("name", name);
-        args.putString("phone number", phoneNumber);
+        args.putString("phone_number", phoneNumber);
 
         EditContactDialog dialog = new EditContactDialog();
         dialog.setArguments(args);
 
         dialog.setOnFinishedListener(new EditContactDialog.OnFinishedListener() {
             @Override
-            public void onFinishedWithResult(int result) {
+            public void onFinishedWithResult(int result, Bundle params) {
                 if(result == EditContactDialog.DELETE){
+
                     ConfirmationDialog confirmationDialog = new ConfirmationDialog(MainActivity.this,
-                            "Are You Sure?", "About to delete contact", "Okay", "Cancel");
+                            "Are You Sure?", "About to delete contact " + name, "confirm", "Cancel");
 
                     confirmationDialog.setOnFinished(new ConfirmationDialog.OnFinished() {
                         @Override
                         public void onFinished(boolean result) {
                             if(result){
-                                Toast.makeText(MainActivity.this, "Delete contact", Toast.LENGTH_SHORT).show();
+                                contactLayout.removeView(contactView);
+                                contactsManager.removeContact(name);
                             }
                         }
                     });
 
                     confirmationDialog.show();
                 }
+
+                if(result == EditContactDialog.UPDATE){
+                    String oldName        = params.getString("old_name");
+                    String newName        = params.getString("new_name");
+                    String newPhoneNumber = params.getString("new_phone_number");
+
+                    contactsManager.updateContact(oldName, newName, newPhoneNumber);
+                }
             }
         });
 
         dialog.show(getSupportFragmentManager(), "edit contact");
     }
+
 
     public void callContact(View view) {
         View v = (View)view.getParent().getParent();
@@ -91,7 +166,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFinished(boolean result) {
                 if(result){
-                    Toast.makeText(getApplicationContext(), "call contact " + phoneNumber, Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(Intent.ACTION_CALL);
+                    intent.setData(Uri.parse("tel:" + phoneNumber));
+                    if (intent.resolveActivity(getPackageManager()) != null) {
+                        startActivity(intent);
+                    }
+
+                    Toast.makeText(getApplicationContext(), "Calling " + name, Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -112,7 +193,9 @@ public class MainActivity extends AppCompatActivity {
             public void onFinished(boolean result) {
                 if(result){
                     Toast.makeText(getApplicationContext(),
-                            "message contact " + phoneNumber, Toast.LENGTH_SHORT).show();
+                            "Launching messenger for " + name, Toast.LENGTH_SHORT).show();
+
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.fromParts("sms", phoneNumber, null)));
                 }
             }
         });

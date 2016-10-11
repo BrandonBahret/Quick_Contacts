@@ -18,11 +18,10 @@ public class ConfirmationDialog extends AlertDialog.Builder {
     }
 
     private Context context;
-    private AlertDialog dialog;
 
     private String title, message, positiveButtonText, negativeButtonText;
 
-    public ConfirmationDialog(Context context, String title, String message,
+    ConfirmationDialog(Context context, String title, String message,
                               String positiveButtonText, String negativeButtonText){
         super(context);
         this.context = context;
@@ -54,8 +53,6 @@ public class ConfirmationDialog extends AlertDialog.Builder {
                     }
                 });
 
-        dialog = builder.create();
-
-        return dialog;
+        return builder.create();
     }
 }

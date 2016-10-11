@@ -7,9 +7,9 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AlertDialog;
+import android.telephony.PhoneNumberFormattingTextWatcher;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -22,10 +22,13 @@ public class EditContactDialog extends DialogFragment {
     }
 
     public interface OnFinishedListener{
-        void onFinishedWithResult(int result);
+        void onFinishedWithResult(int result, @Nullable Bundle params);
     }
 
-    public static final int DELETE = 2;
+    public static final int DELETE = 2, UPDATE = 3;
+    public View contentView;
+
+    private String oldName, oldPhoneNumber;
 
     @NonNull
     @Override
@@ -35,13 +38,33 @@ public class EditContactDialog extends DialogFragment {
         builder.setTitle("Edit Contact")
                 .setPositiveButton(R.string.update_contact, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-                        Toast.makeText(getContext(), "Add Contact", Toast.LENGTH_SHORT).show();
+                        Bundle params = new Bundle();
+
+                        Dialog theDialog = Dialog.class.cast(dialog);
+
+                        String newName = ((EditText)theDialog.findViewById(R.id.nameEditText))
+                                .getText().toString();
+
+                        if(newName.length() > 0) {
+
+                            String newPhoneNumber = ((EditText) theDialog.findViewById(R.id.phoneNumberEditText))
+                                    .getText().toString();
+
+                            params.putString("old_name", oldName);
+                            params.putString("new_name", newName);
+                            params.putString("new_phone_number", newPhoneNumber);
+
+                            for (OnFinishedListener listener : onFinishedListeners) {
+                                listener.onFinishedWithResult(UPDATE, params);
+                            }
+
+                        }
                     }
                 })
                 .setNeutralButton(R.string.delete_contact, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
                         for(OnFinishedListener listener: onFinishedListeners){
-                            listener.onFinishedWithResult(DELETE);
+                            listener.onFinishedWithResult(DELETE, null);
                         }
                     }
                 })
@@ -59,19 +82,20 @@ public class EditContactDialog extends DialogFragment {
     @Nullable
     @Override
     public View getView() {
-        View view = View.inflate(getContext(), R.layout.contact_edit, null);
+        contentView = View.inflate(getContext(), R.layout.contact_edit, null);
 
         Bundle args = getArguments();
-        String name = args.getString("name");
-        String phoneNumber = args.getString("phone number");
+        oldName = args.getString("name");
+        oldPhoneNumber = args.getString("phone_number");
 
-        ((EditText)view.findViewById(R.id.nameEditText))
-                .setText(name);
+        EditText nameEdit = (EditText)contentView.findViewById(R.id.nameEditText);
+        nameEdit.setText(oldName);
 
-        ((EditText)view.findViewById(R.id.phoneNumberEditText))
-                .setText(phoneNumber);
+        final EditText phoneEdit = (EditText)contentView.findViewById(R.id.phoneNumberEditText);
+        phoneEdit.addTextChangedListener(new PhoneNumberFormattingTextWatcher());
+        phoneEdit.setText(oldPhoneNumber);
 
-        return view;
+        return contentView;
     }
 }
 
