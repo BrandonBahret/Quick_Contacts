@@ -167,7 +167,7 @@ class ContactsManager {
         return contactId;
     }
 
-    private int getIndexFromContactName(String name){
+    int getIndexFromContactName(String name){
 
         ArrayList<Contact> contacts = getAddressBook();
 
@@ -349,5 +349,17 @@ class ContactsManager {
         v.setLayoutParams(layoutParams);
 
         return v;
+    }
+
+    @Nullable
+    static String getNameFromView(View view){
+        if(view != null){
+            String tag = (String)view.getTag();
+            if(tag.equals("contact_view")){
+                return ((TextView)view.findViewById(R.id.name)).getText().toString();
+            }
+        }
+
+        return null;
     }
 }

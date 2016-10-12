@@ -36,30 +36,49 @@ public class MainActivity extends AppCompatActivity {
                     String phoneNumber = params.getString("phone_number");
                     int index = params.getInt("index");
 
-                    contactLayout.addView(contactsManager.getView(name, phoneNumber, 20, 40), index);
+                    removeAlphabeticalSectioning();
+
+                    contactLayout.addView(contactsManager.getView(name, phoneNumber,
+                            (int)getResources().getDimension(R.dimen.contactsTopMargin),
+                            (int)getResources().getDimension(R.dimen.contactsBottomMargin)),
+                            index);
+
+                    updateAlphabeticalSectioning();
                 }
 
-                else if(type == contactsManager.UPDATED){
+                else if(type == contactsManager.UPDATED) {
                     String oldName = params.getString("old_name");
                     String newName = params.getString("new_name");
                     String newPhoneNumber = params.getString("new_phone_number");
-                    int index = params.getInt("index");
 
-                    for(int i = 0; i < contactLayout.getChildCount(); i++){
+                    removeAlphabeticalSectioning();
+
+                    for (int i = 0; i < contactLayout.getChildCount(); i++) {
                         View view = contactLayout.getChildAt(i);
-                        String name = ((TextView)view.findViewById(R.id.name)).getText().toString();
-                        if(name.equalsIgnoreCase(oldName)){
-                            contactLayout.removeView(view);
+                        String tag = (String) view.getTag();
 
-                            contactLayout.addView(contactsManager.getView(newName, newPhoneNumber, 20, 40), index);
+                        if (tag != null) {
+                            if (tag.equals("contact_view")) {
+                                String name = ((TextView) view.findViewById(R.id.name)).getText().toString();
+                                if (name.equalsIgnoreCase(oldName)) {
+                                    int index = contactsManager.getIndexFromContactName(newName);
+                                    contactLayout.removeView(view);
+                                    contactLayout.addView(contactsManager.getView(newName, newPhoneNumber,
+                                            (int) getResources().getDimension(R.dimen.contactsTopMargin),
+                                            (int) getResources().getDimension(R.dimen.contactsBottomMargin))
+                                            , index);
+                                    break;
+                                }
+                            }
                         }
                     }
 
+                    updateAlphabeticalSectioning();
                 }
+
             }
         });
 
-        // TODO :: add Alphabetical sectioning
         // TODO :: add Alphabetical side indexing
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -120,6 +139,8 @@ public class MainActivity extends AppCompatActivity {
     public void searchContacts(String query){
         query = query.toLowerCase();
 
+        removeAlphabeticalSectioning();
+
         for(int i = 0; i < contactLayout.getChildCount(); i++){
             View view = contactLayout.getChildAt(i);
             String name = ((TextView)view.findViewById(R.id.name)).getText().toString();
@@ -131,6 +152,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        updateAlphabeticalSectioning();
     }
 
     public void displayContacts(){
@@ -138,10 +160,59 @@ public class MainActivity extends AppCompatActivity {
 
         contactLayout = (LinearLayout)findViewById(R.id.contacts_container);
 
+        removeAlphabeticalSectioning();
+
         for(ContactsManager.Contact contact : contacts){
-            View newView = contactsManager.getView( contact.name, contact.phoneNumber, 20, 40 );
+
+            View newView = contactsManager.getView( contact.name, contact.phoneNumber,
+                    (int)getResources().getDimension(R.dimen.contactsTopMargin), (int)getResources().getDimension(R.dimen.contactsBottomMargin));
+
             contactLayout.addView(newView);
         }
+
+        updateAlphabeticalSectioning();
+    }
+
+    public void removeAlphabeticalSectioning(){
+        for (int i = 0; i < contactLayout.getChildCount(); i++) {
+            View view = contactLayout.getChildAt(i);
+            String tag = (String) view.getTag();
+
+            if (tag.equals("alphabetical_sectioning")) {
+                contactLayout.removeViewAt(i);
+            }
+        }
+    }
+
+    public void updateAlphabeticalSectioning(){
+
+        int contactsLength = contactLayout.getChildCount();
+
+        Character section = '.';
+
+        for(int i = 0; i < contactsLength; i++){
+            View contactView = contactLayout.getChildAt(i);
+            String name = ContactsManager.getNameFromView(contactView);
+
+            if(name != null){
+                Character leadingChar = name.toLowerCase().charAt(0);
+                if(!Character.isLetter(leadingChar)){
+                    leadingChar = '#';
+                }
+                if(!leadingChar.equals(section)){
+                    section = leadingChar;
+                    View view = View.inflate(MainActivity.this, R.layout.alphabetical_sectioning, null);
+                    TextView sectionHeader = (TextView)view.findViewById(R.id.alphabetical_section);
+                    sectionHeader.setText(section.toString());
+                    contactLayout.addView(view, i);
+
+                    contactsLength = contactLayout.getChildCount();
+                }
+
+            }
+        }
+
+
     }
 
     public void editContact(View view) {
@@ -171,8 +242,11 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void onFinished(boolean result) {
                             if(result){
-                                contactLayout.removeView(contactView);
                                 contactsManager.removeContact(name);
+
+                                removeAlphabeticalSectioning();
+                                contactLayout.removeView(contactView);
+                                updateAlphabeticalSectioning();
                             }
                         }
                     });
