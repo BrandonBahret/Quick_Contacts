@@ -14,6 +14,7 @@
     <string name="about_to_delete_format">About to delete contact %s</string>
     <string name="about_to_call_format">About to call %s</string>
     <string name="about_to_message_format">Start conversation with %s</string>
+    <string name="number_of_contacts_format">Number of contacts: %d</string>
 
     <!-- Content Descriptions -->
     <string name="text_message">text message</string>

@@ -207,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
             View view = contactLayout.getChildAt(i);
             String tag = (String) view.getTag();
 
-            if (tag.equals("alphabetical_sectioning")) {
+            if (tag.equals("sectioning")) {
                 contactLayout.removeViewAt(i);
             }
         }
@@ -219,29 +219,41 @@ public class MainActivity extends AppCompatActivity {
 
         Character section = '.';
 
+        int count = 0;
         for(int i = 0; i < contactsLength; i++){
             View contactView = contactLayout.getChildAt(i);
-            String name = getNameFromView(contactView);
 
-            if(name != null){
-                Character leadingChar = name.toLowerCase().charAt(0);
-                if(!Character.isLetter(leadingChar)){
-                    leadingChar = '#';
+            if(contactView.getVisibility() == View.VISIBLE) {
+
+                String name = getNameFromView(contactView);
+
+                if (name != null) {
+                    Character leadingChar = name.toLowerCase().charAt(0);
+                    if (!Character.isLetter(leadingChar)) {
+                        leadingChar = '#';
+                    }
+                    if (!leadingChar.equals(section)) {
+                        section = leadingChar;
+                        View view = View.inflate(MainActivity.this, R.layout.alphabetical_sectioning, null);
+                        TextView sectionHeader = (TextView) view.findViewById(R.id.alphabetical_section);
+                        sectionHeader.setText(section.toString());
+                        contactLayout.addView(view, i);
+
+                        contactsLength = contactLayout.getChildCount();
+                    }
+                    else{
+                        count++;
+                    }
                 }
-                if(!leadingChar.equals(section)){
-                    section = leadingChar;
-                    View view = View.inflate(MainActivity.this, R.layout.alphabetical_sectioning, null);
-                    TextView sectionHeader = (TextView)view.findViewById(R.id.alphabetical_section);
-                    sectionHeader.setText(section.toString());
-                    contactLayout.addView(view, i);
-
-                    contactsLength = contactLayout.getChildCount();
-                }
-
             }
         }
 
+        View numberOfContacts = View.inflate(MainActivity.this, R.layout.number_of_contacts, null);
+        TextView text = (TextView)numberOfContacts.findViewById(R.id.text_section);
+        String numberOfContactsString = String.format(Locale.US, getString(R.string.number_of_contacts_format), count);
+        text.setText(numberOfContactsString);
 
+        contactLayout.addView(numberOfContacts);
     }
 
     public void editContact(View view) {
