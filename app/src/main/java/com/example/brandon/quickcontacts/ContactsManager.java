@@ -11,10 +11,6 @@ import android.os.Bundle;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.support.annotation.Nullable;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -334,32 +330,5 @@ class ContactsManager {
                     Toast.LENGTH_SHORT).show();
         }
 
-    }
-
-    View getView(String name, String phoneNumber, int topMargin, int bottomMargin){
-        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        layoutParams.setMargins(0, topMargin, 0, bottomMargin);
-
-        View v = View.inflate(context, R.layout.contact_layout, null);
-
-        ((TextView)v.findViewById(R.id.name)).setText(name);
-        ((TextView)v.findViewById(R.id.phonenumber)).setText(phoneNumber);
-
-        v.setLayoutParams(layoutParams);
-
-        return v;
-    }
-
-    @Nullable
-    static String getNameFromView(View view){
-        if(view != null){
-            String tag = (String)view.getTag();
-            if(tag.equals("contact_view")){
-                return ((TextView)view.findViewById(R.id.name)).getText().toString();
-            }
-        }
-
-        return null;
     }
 }

@@ -3,12 +3,14 @@ package com.example.brandon.quickcontacts;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -38,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
 
                     removeAlphabeticalSectioning();
 
-                    contactLayout.addView(contactsManager.getView(name, phoneNumber,
+                    contactLayout.addView(getView(name, phoneNumber,
                             (int)getResources().getDimension(R.dimen.contactsTopMargin),
                             (int)getResources().getDimension(R.dimen.contactsBottomMargin)),
                             index);
@@ -63,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
                                 if (name.equalsIgnoreCase(oldName)) {
                                     int index = contactsManager.getIndexFromContactName(newName);
                                     contactLayout.removeView(view);
-                                    contactLayout.addView(contactsManager.getView(newName, newPhoneNumber,
+                                    contactLayout.addView(getView(newName, newPhoneNumber,
                                             (int) getResources().getDimension(R.dimen.contactsTopMargin),
                                             (int) getResources().getDimension(R.dimen.contactsBottomMargin))
                                             , index);
@@ -155,6 +157,33 @@ public class MainActivity extends AppCompatActivity {
         updateAlphabeticalSectioning();
     }
 
+    View getView(String name, String phoneNumber, int topMargin, int bottomMargin){
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        layoutParams.setMargins(0, topMargin, 0, bottomMargin);
+
+        View v = View.inflate(MainActivity.this, R.layout.contact_layout, null);
+
+        ((TextView)v.findViewById(R.id.name)).setText(name);
+        ((TextView)v.findViewById(R.id.phonenumber)).setText(phoneNumber);
+
+        v.setLayoutParams(layoutParams);
+
+        return v;
+    }
+
+    @Nullable
+    String getNameFromView(View view){
+        if(view != null){
+            String tag = (String)view.getTag();
+            if(tag.equals("contact_view")){
+                return ((TextView)view.findViewById(R.id.name)).getText().toString();
+            }
+        }
+
+        return null;
+    }
+
     public void displayContacts(){
         ArrayList<ContactsManager.Contact> contacts = contactsManager.getAddressBook();
 
@@ -164,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
 
         for(ContactsManager.Contact contact : contacts){
 
-            View newView = contactsManager.getView( contact.name, contact.phoneNumber,
+            View newView = getView( contact.name, contact.phoneNumber,
                     (int)getResources().getDimension(R.dimen.contactsTopMargin), (int)getResources().getDimension(R.dimen.contactsBottomMargin));
 
             contactLayout.addView(newView);
@@ -192,7 +221,7 @@ public class MainActivity extends AppCompatActivity {
 
         for(int i = 0; i < contactsLength; i++){
             View contactView = contactLayout.getChildAt(i);
-            String name = ContactsManager.getNameFromView(contactView);
+            String name = getNameFromView(contactView);
 
             if(name != null){
                 Character leadingChar = name.toLowerCase().charAt(0);
